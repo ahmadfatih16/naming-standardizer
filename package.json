@@ -27,6 +27,9 @@
     "lint": "eslint src",
     "test": "vscode-test"
   },
+  "dependencies": {
+    "naming-standardizer-engine": "file:../naming-standardizer-engine"
+  },
   "devDependencies": {
     "@types/vscode": "^1.106.0",
     "@types/mocha": "^10.0.10",
