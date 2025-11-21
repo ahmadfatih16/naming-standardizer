@@ -9,15 +9,29 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": ["*"],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "naming-standardizer.helloWorld",
         "title": "Hello World"
+      },
+
+      {
+        "command": "naming-standardizer.scanAndFixFolder",
+        "title": "Naming: Scan & Fix Folder"
       }
-    ]
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "naming-standardizer.scanAndFixFolder",
+          "when": "explorerResourceIsFolder", 
+          "group": "modification"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
