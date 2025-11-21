@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as Linter from 'naming-standardizer-engine';
+import { outputChannel } from '../extension';
 
 export async function scanAndFixFolder(folderUri: vscode.Uri) {
     if (!folderUri) {
@@ -8,9 +9,8 @@ export async function scanAndFixFolder(folderUri: vscode.Uri) {
         return;
     }
 
-    // 1. Normalisasi Path
+    // Normalisasi Path (Solusi Windows)
     const normalize = (p: string) => p.split(path.sep).join('/');
-    
     const rawFolderPath = folderUri.fsPath;
     const projectRoot = vscode.workspace.getWorkspaceFolder(folderUri)?.uri.fsPath || rawFolderPath;
 
@@ -20,29 +20,40 @@ export async function scanAndFixFolder(folderUri: vscode.Uri) {
         cancellable: false
     }, async (progress) => {
         
+        // 1. Muat Config
         const config = Linter.loadConfig(projectRoot);
+
+        // --- LOG HEADER (Sesuai Request Opsi 2) ---
+        outputChannel.show(true); // Buka panel output otomatis
+        const time = new Date().toLocaleTimeString();
+        outputChannel.appendLine(`[${time}] SCAN: ${rawFolderPath}`);
+        outputChannel.appendLine(`-> Aturan Aktif: File (${config.rules.fileCase}), Folder (${config.rules.folderCase})`);
+        // ------------------------------------------
+        
+        // 2. Scan & Filter
         let allFiles = Linter.scanFiles(rawFolderPath, config.ignore);
-
-        // --- 2. FILTER LEBIH KETAT (SEGMENT CHECK) ---
+        
         const IGNORED_NAMES = ['node_modules', 'dist', '.git', '.vscode', 'out', 'build', 'coverage'];
-
         allFiles = allFiles.filter(filePath => {
             const normalized = normalize(filePath);
             const segments = normalized.split('/'); 
-            const hasIgnoredFolder = segments.some(segment => IGNORED_NAMES.includes(segment));
-            return !hasIgnoredFolder;
+            return !segments.some(segment => IGNORED_NAMES.includes(segment));
         });
-        // ----------------------------------------------
 
+        // 3. Linting
         const errors = Linter.lint(allFiles, config);
         const fixableErrors = errors.filter(e => e.suggestedFix && e.type === 'case-rule');
 
+        // --- LOG ANALISIS ---
+        outputChannel.appendLine(`-> Menganalisis... Ditemukan ${fixableErrors.length} pelanggaran.`);
+
         if (fixableErrors.length === 0) {
             vscode.window.showInformationMessage('Tidak ditemukan pelanggaran penamaan di folder ini. Aman! ✅');
+            outputChannel.appendLine(`-> Status: AMAN (Sesuai standar).\n`);
             return;
         }
 
-        // UI Preview
+        // 4. UI Preview
         const items: vscode.QuickPickItem[] = fixableErrors.map(err => {
             const fileName = path.basename(err.filePath);
             return {
@@ -53,29 +64,25 @@ export async function scanAndFixFolder(folderUri: vscode.Uri) {
             };
         });
 
-        // --- PERUBAHAN DI SINI: Instruksi Cancel ---
         const selectedItems = await vscode.window.showQuickPick(items, {
-            // Kita tambahkan instruksi jelas di sini
             placeHolder: `Ditemukan ${fixableErrors.length} pelanggaran. Pilih file (Tekan 'ESC' untuk Batal)`,
             canPickMany: true,
             ignoreFocusOut: true
         });
 
-        // --- PERUBAHAN DI SINI: Logika Batal ---
-        
-        // 1. Jika user menekan ESC atau klik di luar (hasilnya undefined)
+        // Handle Batal
         if (!selectedItems) {
             vscode.window.showInformationMessage('Operasi rename dibatalkan ❌');
+            outputChannel.appendLine(`-> DIBATALKAN: User menekan ESC.\n`);
             return;
         }
-
-        // 2. Jika user uncheck semua item lalu tekan OK
         if (selectedItems.length === 0) {
-            vscode.window.showInformationMessage('Tidak ada file yang dipilih untuk diubah.');
+            vscode.window.showInformationMessage('Tidak ada file yang dipilih.');
+            outputChannel.appendLine(`-> DIBATALKAN: Tidak ada file dipilih.\n`);
             return; 
         }
 
-        // Eksekusi Rename
+        // 5. Eksekusi Rename
         const edit = new vscode.WorkspaceEdit();
         
         selectedItems.forEach(item => {
@@ -90,6 +97,11 @@ export async function scanAndFixFolder(folderUri: vscode.Uri) {
                     vscode.Uri.file(absOldPath), 
                     vscode.Uri.file(absNewPath)
                 );
+
+                // --- LOG RENAME ---
+                const oldName = path.basename(absOldPath);
+                const newName = path.basename(absNewPath);
+                outputChannel.appendLine(`   [RENAME] ${oldName} -> ${newName}`);
             }
         });
 
@@ -97,8 +109,11 @@ export async function scanAndFixFolder(folderUri: vscode.Uri) {
         
         if (success) {
             vscode.window.showInformationMessage(`Berhasil me-rename ${selectedItems.length} item! 🎉`);
+            // --- LOG SUKSES ---
+            outputChannel.appendLine(`-> SUKSES: ${selectedItems.length} file diubah.\n`);
         } else {
             vscode.window.showErrorMessage('Gagal melakukan rename massal.');
+            outputChannel.appendLine(`-> GAGAL: Terjadi kesalahan sistem saat rename.\n`);
         }
     });
 }
