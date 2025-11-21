@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as Linter from 'naming-standardizer-engine'; 
 import { scanAndFixFolder } from './commands/scanAndFix';
+import { configureRules } from './commands/configure';
 
 let diagnosticCollection: vscode.DiagnosticCollection;
 
@@ -22,8 +23,14 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidSaveTextDocument(checkFile)
     );
 
+    //scan&fix
     context.subscriptions.push(
         vscode.commands.registerCommand('naming-standardizer.scanAndFixFolder', scanAndFixFolder)
+    );
+    
+    //configure rules
+    context.subscriptions.push(
+        vscode.commands.registerCommand('naming-standardizer.configureRules', configureRules)
     );
 
     // 3. Cek file yang sedang aktif sekarang

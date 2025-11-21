@@ -21,6 +21,11 @@
       {
         "command": "naming-standardizer.scanAndFixFolder",
         "title": "Naming: Scan & Fix Folder"
+      },
+
+      {
+        "command": "naming-standardizer.configureRules",
+        "title": "Naming: Configure Rules (Buat aturan penamaan file/folder anda)"
       }
     ],
     "menus": {
